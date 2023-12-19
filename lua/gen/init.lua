@@ -65,7 +65,7 @@ end
 
 local default_options = {
     model = "mistral",
-    debug = true,
+    debug = false,
     show_prompt = false,
     show_model = false,
     -- command = 'curl --silent --no-buffer -X POST http://localhost:11434/api/generate -d $body',
@@ -239,7 +239,6 @@ M.exec = function(options)
         cmd = M.command
     end
 
-    -- <s>[INST] <<SYS>>\n{your_system_message}\n<</SYS>>\n\n{user_message_1} [/INST]
     prompt = "<s>[INST] " .. prompt .. " [/INST]"
     -- print("PROMPT >" .. prompt .. "<")
 
@@ -278,9 +277,6 @@ M.exec = function(options)
     local job_id = vim.fn.jobstart(cmd, {
         -- stderr_buffered = opts.debug,
         on_stdout = function(_, data, _)
-            -- print("data", data)
-            -- print("data length", #data)
-            -- print("data type", type(data))
             -- window was closed, so cancel the job
             if not M.float_win or not vim.api.nvim_win_is_valid(M.float_win) then
                 if job_id then vim.fn.jobstop(job_id) end
@@ -292,18 +288,12 @@ M.exec = function(options)
             end
 
             local response = data[1]
-            print("res ", response)
-            -- print("prompt ", prompt)
-            -- print("esc prompt ", vim.fn.shellescape(prompt))
-            -- local nlprompt = string.gsub(prompt, "\n", "\\n")
-            -- print("nl prompt ", nlprompt)
-            -- response = string.gsub(response, nlprompt, "")
-            -- print("res without prompt ", response)
+            if opts.debug then print("res ", response) end
+
             if #response == 0 then
                 return
             end
 
-            -- print("processing response")
             process_response(response, job_id, opts.json_response, prompt)
         end,
 
@@ -329,9 +319,7 @@ M.exec = function(options)
                     local extracted = M.result_string:match(extractor)
                     if not extracted then
                         if not opts.no_auto_close then
-                            print("result_buffer1", M.result_buffer)
                             vim.api.nvim_win_hide(M.float_win)
-                            print("result_buffer2", M.result_buffer)
                             -- vim.api.nvim_buf_delete(M.result_buffer,
                             --                         {force = true})
                             reset()
