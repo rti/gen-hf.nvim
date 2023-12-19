@@ -304,19 +304,20 @@ M.exec = function(options)
         end,
 
         on_stderr = function(_, data, _)
-            if opts.debug then
-                -- window was closed, so cancel the job
-                if not M.float_win or not vim.api.nvim_win_is_valid(M.float_win) then
-                    if job_id then vim.fn.jobstop(job_id) end
-                    return
-                end
-
-                if data == nil or #data == 0 then return end
-
-                M.result_string = M.result_string .. table.concat(data, "\n")
-                local lines = vim.split(M.result_string, "\n")
-                write_to_buffer(lines)
-            end
+            -- if opts.debug then
+            --     -- window was closed, so cancel the job
+            --     if not M.float_win or not vim.api.nvim_win_is_valid(M.float_win) then
+            --         if job_id then vim.fn.jobstop(job_id) end
+            --         return
+            --     end
+            --
+            --     if data == nil or #data == 0 then return end
+            --
+            --     M.result_string = M.result_string .. table.concat(data, "\n")
+            --     local lines = vim.split(M.result_string, "\n")
+            --     print("write_to_buffer in stderr")
+            --     write_to_buffer(lines)
+            -- end
         end,
         on_exit = function(a, b)
             if b == 0 and opts.replace and M.result_buffer then
