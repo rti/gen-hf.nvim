@@ -1,4 +1,48 @@
-local prompts = require("gen.prompts")
+-- local prompts = require("gen.prompts")
+local prompts = {
+    Generate = { prompt = "$input", replace = true },
+    Chat = { prompt = "$input" },
+    Summarize = { prompt = "Summarize the following text:\n$text" },
+    Ask = { prompt = "Regarding the following text, $input:\n$text" },
+    Change = {
+        prompt = "Change the following text, $input, just output the final text without additional quotes around it:\n$text",
+        replace = true,
+    },
+    Enhance_Grammar_Spelling = {
+        prompt = "Modify the following text to improve grammar and spelling, just output the final text without additional quotes around it:\n$text",
+        replace = true,
+    },
+    Enhance_Wording = {
+        prompt = "Modify the following text to use better wording, just output the final text without additional quotes around it:\n$text",
+        replace = true,
+    },
+    Make_Concise = {
+        prompt = "Modify the following text to make it as simple and concise as possible, just output the final text without additional quotes around it:\n$text",
+        replace = true,
+    },
+    Make_List = {
+        prompt = "Render the following text as a markdown list:\n$text",
+        replace = true,
+    },
+    Make_Table = {
+        prompt = "Render the following text as a markdown table:\n$text",
+        replace = true,
+    },
+    Review_Code = {
+        prompt = "Review the following code and make concise suggestions:\n```$filetype\n$text\n```",
+    },
+    Enhance_Code = {
+        prompt = "Enhance the following code, only output the result in format ```$filetype\n...\n```:\n```$filetype\n$text\n```",
+        replace = true,
+        extract = "```$filetype\n(.-)```",
+    },
+    Change_Code = {
+        prompt = "Regarding the following code, $input, only output the result in format ```$filetype\n...\n```:\n```$filetype\n$text\n```",
+        replace = true,
+        extract = "```$filetype\n(.-)```",
+    },
+}
+
 local M = {}
 
 local curr_buffer = nil
@@ -21,14 +65,18 @@ end
 
 local default_options = {
     model = "mistral",
-    debug = false,
+    debug = true,
     show_prompt = false,
     show_model = false,
-    command = 'curl --silent --no-buffer -X POST http://localhost:11434/api/generate -d $body',
+    -- command = 'curl --silent --no-buffer -X POST http://localhost:11434/api/generate -d $body',
+    command = "curl https://api-inference.huggingface.co/models/codellama/CodeLlama-34b-Instruct-hf "
+        .. "--silent --no-buffer -X POST "
+        .. '-d $body '
+        .. '-H \'Content-Type: application/json\' '
+        .. ("-H 'Authorization: Bearer " .. os.getenv("HUGGINGFACE_API_KEY") .. "'"),
     json_response = true,
     no_auto_close = false,
     display_mode = "float",
-    no_auto_close = false,
     init = function() pcall(io.popen, "ollama serve > /dev/null 2>&1 &") end,
     list_models = function()
         local response = vim.fn.systemlist(
@@ -191,14 +239,23 @@ M.exec = function(options)
         cmd = M.command
     end
 
-    if string.find(cmd, "%$prompt") then
-        local prompt_escaped = vim.fn.shellescape(prompt)
-        cmd = string.gsub(cmd, "%$prompt", prompt_escaped)
-    end
-    cmd = string.gsub(cmd, "%$model", opts.model)
+    -- <s>[INST] <<SYS>>\n{your_system_message}\n<</SYS>>\n\n{user_message_1} [/INST]
+    prompt = "<s>[INST] " .. prompt .. " [/INST]"
+    -- print("PROMPT >" .. prompt .. "<")
+
+    -- if string.find(cmd, "%$prompt") then
+    --     local prompt_escaped = vim.fn.shellescape(prompt)
+    --     cmd = string.gsub(cmd, "%$prompt", prompt)
+    -- end
+    -- cmd = string.gsub(cmd, "%$model", opts.model)
+
+-- \'{"inputs": "$prompt"}\'
+
+
     if string.find(cmd, "%$body") then
-        local body = {model = opts.model, prompt = prompt, stream = true}
-        if M.context then body.context = M.context end
+    --     local body = {model = opts.model, prompt = prompt, stream = true}
+    --     if M.context then body.context = M.context end
+        local body = { inputs = prompt }
         local json = vim.fn.json_encode(body)
         json = vim.fn.shellescape(json)
         cmd = string.gsub(cmd, "%$body", json)
@@ -207,6 +264,7 @@ M.exec = function(options)
     if M.context ~= nil then write_to_buffer({"", "", "---", ""}) end
 
     local partial_data = ""
+    -- print("partial data reset")
     if opts.debug then print(cmd) end
 
     if M.result_buffer == nil or M.float_win == nil or
@@ -220,6 +278,9 @@ M.exec = function(options)
     local job_id = vim.fn.jobstart(cmd, {
         -- stderr_buffered = opts.debug,
         on_stdout = function(_, data, _)
+            -- print("data", data)
+            -- print("data length", #data)
+            -- print("data type", type(data))
             -- window was closed, so cancel the job
             if not M.float_win or not vim.api.nvim_win_is_valid(M.float_win) then
                 if job_id then vim.fn.jobstop(job_id) end
@@ -230,26 +291,22 @@ M.exec = function(options)
                 return
             end
 
-            for _, line in ipairs(data) do
-                partial_data = partial_data .. line
-                if line:sub(-1) == "}" then
-                    partial_data = partial_data .. "\n"
-                end
+            local response = data[1]
+            print("res ", response)
+            -- print("prompt ", prompt)
+            -- print("esc prompt ", vim.fn.shellescape(prompt))
+            -- local nlprompt = string.gsub(prompt, "\n", "\\n")
+            -- print("nl prompt ", nlprompt)
+            -- response = string.gsub(response, nlprompt, "")
+            -- print("res without prompt ", response)
+            if #response == 0 then
+                return
             end
 
-            local lines = vim.split(partial_data, "\n", {trimempty = true})
-
-            partial_data = table.remove(lines) or ""
-
-            for _, line in ipairs(lines) do
-                process_response(line, job_id, opts.json_response)
-            end
-
-            if partial_data:sub(-1) == "}" then
-                process_response(partial_data, job_id, opts.json_response)
-                partial_data = ""
-            end
+            -- print("processing response")
+            process_response(response, job_id, opts.json_response, prompt)
         end,
+
         on_stderr = function(_, data, _)
             if opts.debug then
                 -- window was closed, so cancel the job
@@ -272,9 +329,11 @@ M.exec = function(options)
                     local extracted = M.result_string:match(extractor)
                     if not extracted then
                         if not opts.no_auto_close then
+                            print("result_buffer1", M.result_buffer)
                             vim.api.nvim_win_hide(M.float_win)
-                            vim.api.nvim_buf_delete(M.result_buffer,
-                                                    {force = true})
+                            print("result_buffer2", M.result_buffer)
+                            -- vim.api.nvim_buf_delete(M.result_buffer,
+                            --                         {force = true})
                             reset()
                         end
                         return
@@ -390,8 +449,9 @@ end, {
     end
 })
 
-function process_response(str, job_id, json_response)
+function process_response(str, job_id, json_response, prompt)
     if string.len(str) == 0 then return end
+
     local text
 
     if json_response then
@@ -400,7 +460,7 @@ function process_response(str, job_id, json_response)
         end)
 
         if success then
-            text = result.response
+            text = result[1].generated_text
             if result.context ~= nil then M.context = result.context end
         else
             write_to_buffer({"", "====== ERROR ====", str, "-------------", ""})
@@ -412,7 +472,18 @@ function process_response(str, job_id, json_response)
 
     if text == nil then return end
 
-    M.result_string = M.result_string .. text
+    -- print("text >", text, "<")
+    -- print("prompt >", prompt, "<")
+
+    -- text = string.gsub(text, prompt, "") .. "\n"
+    -- print("text after >", text, "<")
+
+
+    local _,e = string.find(text, "%[/INST%]  ")
+    text = string.sub(text, e + 1)
+    -- print("text after >", text, "<")
+
+    M.result_string = text
     local lines = vim.split(text, "\n")
     write_to_buffer(lines)
 
@@ -427,5 +498,7 @@ M.select_model = function()
         end
     end)
 end
+
+M.setup(default_options)
 
 return M
