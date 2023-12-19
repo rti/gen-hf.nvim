@@ -255,16 +255,18 @@ M.exec = function(options)
     --     local body = {model = opts.model, prompt = prompt, stream = true}
     --     if M.context then body.context = M.context end
         local body = {
-            return_full_text = true, -- false ;)
-            max_new_tokens = 512,
-            repetition_penalty = 1.05,
+            parameters = {
+                return_full_text = false, -- false ;)
+                max_new_tokens = 1024,
+                -- repetition_penalty = 1.05,
+            },
             inputs = prompt }
         local json = vim.fn.json_encode(body)
         json = vim.fn.shellescape(json)
         cmd = string.gsub(cmd, "%$body", json)
     end
 
-    if M.context ~= nil then write_to_buffer({"", "", "---", ""}) end
+    -- if M.context ~= nil then write_to_buffer({"", "", "---", ""}) end
 
     local partial_data = ""
     -- print("partial data reset")
