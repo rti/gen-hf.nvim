@@ -254,7 +254,11 @@ M.exec = function(options)
     if string.find(cmd, "%$body") then
     --     local body = {model = opts.model, prompt = prompt, stream = true}
     --     if M.context then body.context = M.context end
-        local body = { inputs = prompt }
+        local body = {
+            return_full_text = true, -- false ;)
+            max_new_tokens = 512,
+            repetition_penalty = 1.05,
+            inputs = prompt }
         local json = vim.fn.json_encode(body)
         json = vim.fn.shellescape(json)
         cmd = string.gsub(cmd, "%$body", json)
