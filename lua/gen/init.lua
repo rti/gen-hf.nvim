@@ -474,8 +474,8 @@ function process_response(str, job_id, json_response, prompt)
     -- print("text after >", text, "<")
 
 
-    local _,e = string.find(text, "%[/INST%]  ")
-    text = string.sub(text, e + 1)
+    -- local _,e = string.find(text, "%[/INST%]  ")
+    -- text = string.sub(text, e + 1)
     -- print("text after >", text, "<")
 
     M.result_string = text
